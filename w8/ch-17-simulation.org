@@ -100,7 +100,7 @@
 
    ./malloc.py -n 1000 -H 0 -p FIRST -s 0 -c -l SIZESORT+  |egrep -oi 'Size [0-9]+' |cut -f2 -d' ' |  gnuplot -p -e 'plot "/dev/stdin" using 0:1 with lines'
 
-   Output show the [[file:first-fit-free-list-size.svg\]\]][list size stabilizes]] after a few hundred allocations without coalescing.
+   Output shows the [[file:first-fit-free-list-size.svg][list size stabilizes]] after a few hundred allocations without coalescing.
 
    The above command using BEST or FIRST fit had the same # of allocation failures (177) vs WORST (658).  These numbers were slightly smaller with coalescing, but not by much.
 
