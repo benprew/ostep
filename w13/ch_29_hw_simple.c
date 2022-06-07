@@ -38,9 +38,9 @@ int get(counter_t *c) {
   return rc;
 }
 
-void *add_one_million(void *arg) {
+void *add_ten_million(void *arg) {
   counter_t *c = (counter_t *) arg;
-  for (int i = 0; i < 1000000; i++) {
+  for (int i = 0; i < 1e7; i++) {
     increment(c);
   }
   return (void *) EXIT_SUCCESS;
@@ -50,19 +50,18 @@ int main_no_threads(int argc, char* argv[]) {
   int num_threads = 5;
   int start;
   counter_t c;
-  if (argc == 2) {
+  if (argc >= 2) {
     num_threads = atoi(argv[1]);
   }
 
   start = Time_GetSeconds();
   init(&c);
   for(int i = 0; i < num_threads; i++) {
-    add_one_million(&c);
+    add_ten_million(&c);
   }
   int dur = Time_GetSeconds() - start;
 
-  printf("Time taken: %d sec\n", dur);
-  printf("counter total: %d\n", get(&c));
+  printf("Time taken: %d sec [threads=0,total=%d]\n", dur, get(&c));
 
   return EXIT_SUCCESS;
 }
@@ -72,7 +71,7 @@ int main_threads(int argc, char* argv[]) {
   int num_threads = 5;
   int start;
   counter_t c;
-  if (argc == 2) {
+  if (argc >= 2) {
     num_threads = atoi(argv[1]);
   }
   pthread_t threads[num_threads];
@@ -80,19 +79,21 @@ int main_threads(int argc, char* argv[]) {
   start = Time_GetSeconds();
   init(&c);
   for(int i = 0; i < num_threads; i++) {
-    Pthread_create(&threads[i], NULL, add_one_million, &c);
+    Pthread_create(&threads[i], NULL, add_ten_million, &c);
   }
   for (int i = 0; i < num_threads; i++) {
     Pthread_join(threads[i], NULL);
   }
   int dur = Time_GetSeconds() - start;
 
-  printf("Time taken: %d sec\n", dur);
-  printf("counter total: %d\n", get(&c));
+  printf("Time taken: %d sec [threads=%d,total=%d]\n", dur, num_threads, get(&c));
 
   return EXIT_SUCCESS;
 }
 
 int main(int argc, char* argv[]) {
+  if (argc == 3) {
+    return main_no_threads(argc, argv);
+  }
   return main_threads(argc, argv);
 }

@@ -1,7 +1,11 @@
-all: 1 simple
+all: simple sloppy
 
-1:
-	gcc -Wall ch_29_1.c -o 1 -O
+clean:
+	rm -f simple sploppy
+
 
 simple: ch_29_hw_simple.c
 	gcc -Wall -O ch_29_hw_simple.c -o simple
+
+sloppy: ch_29_hw_sloppy.c
+	gcc -Wall -O ch_29_hw_sloppy.c -o sloppy
