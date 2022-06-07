@@ -1,4 +1,4 @@
-## Week 8 - Tue Apr 19th @7:00 '22
+## Week 8 - Mon Apr 25th @7:00 '22
 
 Assignment:
 - Read chapters 17 & 18
