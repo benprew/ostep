@@ -1,6 +1,6 @@
 * OSTEP Chapter 32 Homework
 
-1. **First let’s make sure you understand how the programs generally work, and some of the key options. Study the code in `vector-deadlock.c`, as well as in `main-common.c` and related files. Now, run `./vector-deadlock -n 2 -l 1 -v`, which instantiates two threads (`-n 2`), each of which does one vector add (`-l 1`), and does so in verbose mode (`-v`). Make sure you understand the output. How does the output change from run to run?**
+1. *First let’s make sure you understand how the programs generally work, and some of the key options. Study the code in `vector-deadlock.c`, as well as in `main-common.c` and related files. Now, run `./vector-deadlock -n 2 -l 1 -v`, which instantiates two threads (`-n 2`), each of which does one vector add (`-l 1`), and does so in verbose mode (`-v`). Make sure you understand the output. How does the output change from run to run?*
 
    I had to increase # of threads to 4 before I started seeing differences in output.  The changes in output represent thread context switches, so you can see the `add` message before `vector_add` and the `add` message after `vector_add` get interrupted by other threads.
 
@@ -16,7 +16,7 @@
                                                <-add(0, 1)
    #+end_src
 
-2. **Now add the -d flag, and change the number of loops (-l) from 1 to higher numbers. What happens? Does the code (always) deadlock?**
+2. *Now add the -d flag, and change the number of loops (-l) from 1 to higher numbers. What happens? Does the code (always) deadlock?*
 
    I had a hard time getting it to deadlock, even with much larger values
 
@@ -24,17 +24,17 @@
      ./vector-deadlock -d -n 64 -l 20000 -v
    #+end_src
 
-3. **How does changing the number of threads (-n) change the outcome of the program? Are there any values of -n that ensure no deadlock occurs?**
+3. *How does changing the number of threads (-n) change the outcome of the program? Are there any values of -n that ensure no deadlock occurs?*
 
    1 would ensure there are no deadlocks, because only a single thread would be accessing the vector.
 
-4. **Now examine the code in vector-global-order.c. First, make sure you understand what the code is trying to do; do you understand why the code avoids deadlock? Also, why is there a special case in this vector add() routine when the source and destination vectors are the same?**
+4. *Now examine the code in vector-global-order.c. First, make sure you understand what the code is trying to do; do you understand why the code avoids deadlock? Also, why is there a special case in this vector add() routine when the source and destination vectors are the same?*
 
    It avoids deadlock by locking src and dst in a predictable way, using the pointer value of vectors.  The pointer memory address is consistent across threads, so this should prevent threads from trying to take locks in a different order.
 
    The special case is triggered when you're swapping values in the same vector.  Because the vectors are the same, you only need a single lock.
 
-5. **Now run the code with the following flags: -t -n 2 -l 100000 -d. How long does the code take to complete? How does the total time change when you increase the number of loops, or the number of threads?**
+5. *Now run the code with the following flags: -t -n 2 -l 100000 -d. How long does the code take to complete? How does the total time change when you increase the number of loops, or the number of threads?*
 
    #+begin_src shell
      ><> time ./vector-global-order -t -n 2 -l 100000 -d
@@ -58,7 +58,7 @@
 
    #+end_src
 
-6. **What happens if you turn on the parallelism flag (-p)? How much would you expect performance to change when each thread is working on adding different vectors (which is what -p enables) versus working on the same ones?**
+6. *What happens if you turn on the parallelism flag (-p)? How much would you expect performance to change when each thread is working on adding different vectors (which is what -p enables) versus working on the same ones?*
 
    I would expect the execution time to be reduced becase you're not waiting on any locks.  However, at 1M iterations, there isn't much difference
 
@@ -93,7 +93,7 @@
         sys time    2.90 millis  929.00 micros    1.97 millis
    #+end_src
 
-7. **Now let’s study vector-try-wait.c. First make sure you understand the code. Is the first call to pthread mutex trylock() really needed? Now run the code. How fast does it run compared to the global order approach? How does the number of retries, as counted by the code, change as the number of threads increases?**
+7. *Now let’s study vector-try-wait.c. First make sure you understand the code. Is the first call to pthread mutex trylock() really needed? Now run the code. How fast does it run compared to the global order approach? How does the number of retries, as counted by the code, change as the number of threads increases?*
 
    Yes, because you have to lock both the src and dst vectors.
 
@@ -112,7 +112,7 @@
         sys time    0.00 secs    1.05 millis    0.00 secs
    #+end_src
 
-8. **Now let’s look at vector-avoid-hold-and-wait.c. What is the main problem with this approach? How does its performance compare to the other versions, when running both with -p and without it?**
+8. *Now let’s look at vector-avoid-hold-and-wait.c. What is the main problem with this approach? How does its performance compare to the other versions, when running both with -p and without it?*
 
    It has a global lock, so multiple threads cannot acquires locks at the same time, even if the locks wouldn't overlap.
 
@@ -139,11 +139,11 @@
         sys time    3.85 millis  926.00 micros    2.92 millis
    #+end_src
 
-9. **Finally, let’s look at vector-nolock.c. This version doesn’t use locks at all; does it provide the exact same semantics as the other versions? Why or why not?**
+9. *Finally, let’s look at vector-nolock.c. This version doesn’t use locks at all; does it provide the exact same semantics as the other versions? Why or why not?*
 
 
 
-10. **Now compare its performance to the other versions, both when threads are working on the same two vectors (no -p) and when each thread is working on separate vectors (-p). How does this no-lock version perform?**
+10. *Now compare its performance to the other versions, both when threads are working on the same two vectors (no -p) and when each thread is working on separate vectors (-p). How does this no-lock version perform?*
 
     Surprisingly, fetch_and_add is slower than a global lock .5secs vs .33secs.  I'm not sure if this is an implementation detail, but I would have expected that acquiring a global lock would be slower than executing a few lines of assembly.
 
