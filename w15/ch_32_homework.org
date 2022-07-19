@@ -1,0 +1,210 @@
+* OSTEP Chapter 32 Homework
+
+1. **First let’s make sure you understand how the programs generally work, and some of the key options. Study the code in `vector-deadlock.c`, as well as in `main-common.c` and related files. Now, run `./vector-deadlock -n 2 -l 1 -v`, which instantiates two threads (`-n 2`), each of which does one vector add (`-l 1`), and does so in verbose mode (`-v`). Make sure you understand the output. How does the output change from run to run?**
+
+   I had to increase # of threads to 4 before I started seeing differences in output.  The changes in output represent thread context switches, so you can see the `add` message before `vector_add` and the `add` message after `vector_add` get interrupted by other threads.
+
+   #+begin_src shell
+     ./vector-deadlock -n 4 -l 1 -v
+     ->add(0, 1)
+                   ->add(0, 1)
+                   <-add(0, 1)
+                                 ->add(0, 1)
+                                 <-add(0, 1)
+     <-add(0, 1)
+                                               ->add(0, 1)
+                                               <-add(0, 1)
+   #+end_src
+
+2. **Now add the -d flag, and change the number of loops (-l) from 1 to higher numbers. What happens? Does the code (always) deadlock?**
+
+   I had a hard time getting it to deadlock, even with much larger values
+
+   #+begin_src shell
+     ./vector-deadlock -d -n 64 -l 20000 -v
+   #+end_src
+
+3. **How does changing the number of threads (-n) change the outcome of the program? Are there any values of -n that ensure no deadlock occurs?**
+
+   1 would ensure there are no deadlocks, because only a single thread would be accessing the vector.
+
+4. **Now examine the code in vector-global-order.c. First, make sure you understand what the code is trying to do; do you understand why the code avoids deadlock? Also, why is there a special case in this vector add() routine when the source and destination vectors are the same?**
+
+   It avoids deadlock by locking src and dst in a predictable way, using the pointer value of vectors.  The pointer memory address is consistent across threads, so this should prevent threads from trying to take locks in a different order.
+
+   The special case is triggered when you're swapping values in the same vector.  Because the vectors are the same, you only need a single lock.
+
+5. **Now run the code with the following flags: -t -n 2 -l 100000 -d. How long does the code take to complete? How does the total time change when you increase the number of loops, or the number of threads?**
+
+   #+begin_src shell
+     ><> time ./vector-global-order -t -n 2 -l 100000 -d
+     Time: 0.04 seconds
+
+     ________________________________________________________
+     Executed in   46.41 millis    fish           external
+        usr time   45.12 millis    0.00 micros   45.12 millis
+        sys time   20.36 millis  514.00 micros   19.84 millis
+   #+end_src
+
+   Oddly enough, running deadlock without -v locks relatively reliably.
+
+   #+begin_src shell
+     ><> time  ./vector-deadlock -t -n 2 -l 100000 -d
+     ^C
+     ________________________________________________________
+     Executed in    7.26 secs      fish           external
+        usr time    1.29 millis    0.00 millis    1.29 millis
+        sys time    3.92 millis    1.31 millis    2.61 millis
+
+   #+end_src
+
+6. **What happens if you turn on the parallelism flag (-p)? How much would you expect performance to change when each thread is working on adding different vectors (which is what -p enables) versus working on the same ones?**
+
+   I would expect the execution time to be reduced becase you're not waiting on any locks.  However, at 1M iterations, there isn't much difference
+
+   #+begin_src shell
+     ><> time ./vector-global-order -t -n 2 -l 100000 -d -p
+     Time: 0.04 seconds
+
+     ________________________________________________________
+     Executed in   44.43 millis    fish           external
+        usr time   78.98 millis  922.00 micros   78.06 millis
+        sys time    1.97 millis    0.00 micros    1.97 millis
+   #+end_src
+
+   Jumping to 1M iterations shows a large difference (50% performance increase)
+
+   #+begin_src shell
+     ><> time ./vector-global-order -t -n 2 -l 1000000 -d
+     Time: 0.31 seconds
+
+     ________________________________________________________
+     Executed in  316.35 millis    fish           external
+        usr time  290.30 millis    0.05 millis  290.26 millis
+        sys time  157.21 millis    1.09 millis  156.12 millis
+
+     ~/src/ostep-homework/threads-bugs (master)
+     ><> time ./vector-global-order -t -n 2 -l 1000000 -d -p
+     Time: 0.15 seconds
+
+     ________________________________________________________
+     Executed in  149.51 millis    fish           external
+        usr time  269.67 millis    0.00 micros  269.67 millis
+        sys time    2.90 millis  929.00 micros    1.97 millis
+   #+end_src
+
+7. **Now let’s study vector-try-wait.c. First make sure you understand the code. Is the first call to pthread mutex trylock() really needed? Now run the code. How fast does it run compared to the global order approach? How does the number of retries, as counted by the code, change as the number of threads increases?**
+
+   Yes, because you have to lock both the src and dst vectors.
+
+   Try-wait is much slower than global-order, which is expected because try-wait avoids deadlock by releasing the locks and trying to acquire them again, but global-order always acquires the locks in the same order, it doesn't need to retry.
+
+   At 1M iteractions, it varies between 1.5 and 2.5 seconds, while global-order is less than .5 seconds.
+
+   #+begin_src shell
+     ><> time ./vector-try-wait -t -n 2 -l 1000000 -d
+     Retries: 12537145
+     Time: 2.17 seconds
+
+     ________________________________________________________
+     Executed in    2.17 secs    fish           external
+        usr time    4.29 secs    0.01 millis    4.29 secs
+        sys time    0.00 secs    1.05 millis    0.00 secs
+   #+end_src
+
+8. **Now let’s look at vector-avoid-hold-and-wait.c. What is the main problem with this approach? How does its performance compare to the other versions, when running both with -p and without it?**
+
+   It has a global lock, so multiple threads cannot acquires locks at the same time, even if the locks wouldn't overlap.
+
+   It is even slower than vector-try-wait, which is expected because all lock acquisition has to go through a single global lock, while try-wait only needs to retry if the locks overlap.
+
+   #+begin_src shell
+     ~/src/ostep-homework/threads-bugs (master)
+     ><> time ./vector-avoid-hold-and-wait -t -n 2 -l 1000000 -d -p
+     Time: 0.33 seconds
+
+     ________________________________________________________
+     Executed in  337.82 millis    fish           external
+        usr time  501.96 millis    0.00 micros  501.96 millis
+        sys time  138.35 millis  985.00 micros  137.36 millis
+
+
+     ><> time ./vector-try-wait -t -n 2 -l 1000000 -d -p
+     Retries: 0
+     Time: 0.13 seconds
+
+     ________________________________________________________
+     Executed in  129.54 millis    fish           external
+        usr time  237.89 millis    0.00 micros  237.89 millis
+        sys time    3.85 millis  926.00 micros    2.92 millis
+   #+end_src
+
+9. **Finally, let’s look at vector-nolock.c. This version doesn’t use locks at all; does it provide the exact same semantics as the other versions? Why or why not?**
+
+
+
+10. **Now compare its performance to the other versions, both when threads are working on the same two vectors (no -p) and when each thread is working on separate vectors (-p). How does this no-lock version perform?**
+
+    Surprisingly, fetch_and_add is slower than a global lock .5secs vs .33secs.  I'm not sure if this is an implementation detail, but I would have expected that acquiring a global lock would be slower than executing a few lines of assembly.
+
+    #+begin_src shell
+      ~/src/ostep-homework/threads-bugs (master)
+      ><> time ./vector-nolock -t -n 2 -l 1000000 -d
+      Time: 3.55 seconds
+
+      ________________________________________________________
+      Executed in    3.55 secs    fish           external
+         usr time    7.08 secs    0.00 micros    7.08 secs
+         sys time    0.00 secs  680.00 micros    0.00 secs
+
+      ~/src/ostep-homework/threads-bugs (master)
+      ><> time ./vector-nolock -t -n 2 -l 1000000 -d -p
+      Time: 0.50 seconds
+
+      ________________________________________________________
+      Executed in  506.50 millis    fish           external
+         usr time    1.00 secs    594.00 micros    1.00 secs
+         sys time    0.00 secs    432.00 micros    0.00 secs
+    #+end_src
+
+    At 4 threads with the -p, the nolock is faster than avoid-hold-and-wait, but slower than try-wait.
+
+    Looking into the assembly output, I realize now what I missed.  There's no additional work being done in the loops of the other programs once you've acquired the lock.  And, because you've already acquired the lock, the add instruction is a single assembly call, while the unoptimized version of nolock executes a full function call.
+
+    Compare:
+    https://godbolt.org/z/7Ka868j8s (global-order)
+    https://godbolt.org/z/cKKG9Ef1e (nolock)
+
+    This is gcc without optimization.  However, with optimization, things get interesting.
+
+    Compare:
+    https://godbolt.org/z/zvGr1s95W (global-order)
+    https://godbolt.org/z/KncWjW6x4 (nolock)
+
+    In vector-nolock the loop looks like:
+    #+begin_src shell
+      objdump -d vector-nolock
+
+      401508:       8b 14 06                mov    (%rsi,%rax,1),%edx
+      40150b:       f0 0f c1 14 07          lock xadd %edx,(%rdi,%rax,1)
+
+      401510:       48 83 c0 04             add    $0x4,%rax
+      401514:       48 3d b8 01 00 00       cmp    $0x1b8,%rax
+      40151a:       75 ec                   jne    401508 <vector_add+0x8>
+    #+end_src
+
+    Compared to vector-global-order:
+    #+begin_src shell
+      objdump -d vector-global-order
+
+      401530:       f3 0f 6f 44 05 00       movdqu 0x0(%rbp,%rax,1),%xmm0
+      401536:       f3 0f 6f 0c 03          movdqu (%rbx,%rax,1),%xmm1
+      40153b:       66 0f fe c1             paddd  %xmm1,%xmm0
+      40153f:       0f 11 04 03             movups %xmm0,(%rbx,%rax,1)
+
+      401543:       48 83 c0 10             add    $0x10,%rax
+      401547:       48 3d b8 01 00 00       cmp    $0x1b8,%rax
+      40154d:       75 e1                   jne    401530 <vector_add+0x30>
+    #+end_src
+
+    I guess 2x movdqu, 1 paddd and 2 movups is faster than 1 mov and 1 lock xadd.
