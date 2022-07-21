@@ -167,19 +167,19 @@
          sys time    0.00 secs    432.00 micros    0.00 secs
     #+end_src
 
-    At 4 threads with the -p, the nolock is faster than avoid-hold-and-wait, but slower than try-wait.
+    At 4 threads with -p, nolock is faster than avoid-hold-and-wait, but slower than try-wait.
 
     Looking into the assembly output, I realize now what I missed.  There's no additional work being done in the loops of the other programs once you've acquired the lock.  And, because you've already acquired the lock, the add instruction is a single assembly call, while the unoptimized version of nolock executes a full function call.
 
-    Compare:
-    https://godbolt.org/z/7Ka868j8s (global-order)
-    https://godbolt.org/z/cKKG9Ef1e (nolock)
+  Compare:
+    - https://godbolt.org/z/7Ka868j8s (global-order)
+    - https://godbolt.org/z/cKKG9Ef1e (nolock)
 
     This is gcc without optimization.  However, with optimization, things get interesting.
 
     Compare:
-    https://godbolt.org/z/zvGr1s95W (global-order)
-    https://godbolt.org/z/KncWjW6x4 (nolock)
+    - https://godbolt.org/z/zvGr1s95W (global-order)
+    - https://godbolt.org/z/KncWjW6x4 (nolock)
 
     In vector-nolock the loop looks like:
     #+begin_src shell
@@ -207,4 +207,4 @@
       40154d:       75 e1                   jne    401530 <vector_add+0x30>
     #+end_src
 
-    I guess 2x movdqu, 1 paddd and 2 movups is faster than 1 mov and 1 lock xadd.
+    I guess 2x movdqu, 1 paddd and 2 movups is faster than 1 mov and 1 lock xadd.  On further review, paddd and movdqu and moveups are SIMD instructions, so global-order is vectorizing the simple for loop, which accounts for the performance difference.
