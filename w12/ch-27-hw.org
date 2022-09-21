@@ -1,0 +1,59 @@
+1. First build main-race.c. Examine the code so you can see the (hopefully obvious) data race in the code. Now run helgrind (by typing valgrind --tool=helgrind main-race) to see how it reports the race. Does it point to the right lines of code? What other information does it give to you?
+
+   #+begin_src shell
+     ==3878492== Possible data race during read of size 4 at 0x404038 by thread #1
+     ==3878492== Locks held: none
+     ==3878492==    at 0x4011AB: main (main-race.c:15)
+     ==3878492==
+     ==3878492== This conflicts with a previous write of size 4 by thread #2
+     ==3878492== Locks held: none
+     ==3878492==    at 0x401157: worker (main-race.c:8)
+   #+end_src
+
+2. What happens when you remove one of the offending lines of code?
+
+   #+begin_src shell
+     ==3878653== ERROR SUMMARY: 0 errors from 0 contexts (suppressed: 0 from 0)
+   #+end_src
+
+
+   1. Now add a lock around one of the updates to the shared variable, and then around both. What does helgrind report in each of these cases?
+
+      #+begin_src diff
+        diff --git a/threads-api/main-race.c b/threads-api/main-race.c
+        index 2bc3d64..cdb0528 100644
+        --- a/threads-api/main-race.c
+        +++ b/threads-api/main-race.c
+        @@ -5,14 +5,20 @@
+         int balance = 0;
+
+         void* worker(void* arg) {
+        -    balance++; // unprotected access
+        +    pthread_mutex_t *lock = (pthread_mutex_t*) arg;
+        +    Pthread_mutex_lock(lock);
+        +    balance++; // unprotected access
+        +    Pthread_mutex_unlock(lock);
+             return NULL;
+         }
+
+         int main(int argc, char *argv[]) {
+        +    pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
+             pthread_t p;
+        -    Pthread_create(&p, NULL, worker, NULL);
+        +    Pthread_create(&p, NULL, worker, (void *)&lock);
+        +    Pthread_mutex_lock(&lock);
+             balance++; // unprotected access
+        +    Pthread_mutex_unlock(&lock);
+             Pthread_join(p, NULL);
+             return 0;
+         }
+      #+end_src
+
+
+3. Now let’s look at main-deadlock.c. Examine the code. This code has a problem known as deadlock (which we discuss in much more depth in a forthcoming chapter). Can you see what problem it might have?
+4. Now run helgrind on this code. What does helgrind report?
+5. Now run helgrind on main-deadlock-global.c. Examine the code; does it have the same problem that main-deadlock.c has? Should helgrind be reporting the same error? What does this tell you about tools like helgrind?
+6. Let’s next look at main-signal.c. This code uses a variable (done) to signal that the child is done and that the parent can now continue. Why is this code inefficient? (what does the parent end up spending its time doing, particularly if the child thread takes a long time to complete?)
+7. Now run helgrind on this program. What does it report? Is the code correct?
+8. Now look at a slightly modified version of the code, which is found in main-signal-cv.c. This version uses a condition variable to do the signaling (and associated lock). Why is this code preferred to the previous version? Is it correctness, or performance, or both?
+9. Once again run helgrind on main-signal-cv. Does it report any errors?
